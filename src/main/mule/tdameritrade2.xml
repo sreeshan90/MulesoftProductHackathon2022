@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:sockets="http://www.mulesoft.org/schema/mule/sockets"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:google-sheets="http://www.mulesoft.org/schema/mule/google-sheets" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:twilio="http://www.mulesoft.org/schema/mule/twilio" xmlns:stripe="http://www.mulesoft.org/schema/mule/stripe" xmlns:slack="http://www.mulesoft.org/schema/mule/slack" xmlns:td-ameritrade="http://www.mulesoft.org/schema/mule/td-ameritrade" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/td-ameritrade http://www.mulesoft.org/schema/mule/td-ameritrade/current/mule-td-ameritrade.xsd
+http://www.mulesoft.org/schema/mule/slack http://www.mulesoft.org/schema/mule/slack/current/mule-slack.xsd
+http://www.mulesoft.org/schema/mule/stripe http://www.mulesoft.org/schema/mule/stripe/current/mule-stripe.xsd
+http://www.mulesoft.org/schema/mule/twilio http://www.mulesoft.org/schema/mule/twilio/current/mule-twilio.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/google-sheets http://www.mulesoft.org/schema/mule/google-sheets/current/mule-google-sheets.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/sockets http://www.mulesoft.org/schema/mule/sockets/current/mule-sockets.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<td-ameritrade:config name="Td_Ameritrade_Connector_Config" doc:name="Td Ameritrade Connector Config" doc:id="328b1085-bc70-4c8b-948d-ca58ed3be071" >
+		<td-ameritrade:bearer-connection authorizationHeader="Bearer " baseUri="https://api.tdameritrade.com/v1"/>
+	</td-ameritrade:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="92ce31fe-8e68-4004-9392-8f7bc1ccd842" >
+		<http:listener-connection host="0.0.0.0" port="8085" />
+	</http:listener-config>
+	<slack:config name="Slack_Connector_Config" doc:name="Slack Connector Config" doc:id="b5853695-01c3-471c-a8e8-225159a376fc" >
+		<slack:slack-auth-connection >
+			<slack:oauth-authorization-code consumerKey="" consumerSecret="" />
+			<slack:oauth-callback-config listenerConfig="HTTP_Listener_config" callbackPath="https://127.0.0.1:8080" authorizePath="/auth" externalCallbackUrl="https://127.0.0.1:8080"/>
+		</slack:slack-auth-connection>
+	</slack:config>
+	<google-sheets:config name="Google_Sheets_Config" doc:name="Google Sheets Config" doc:id="bdca7435-0851-4066-b413-272ba5a38cd1" >
+		<google-sheets:oauth-2-0-connection >
+			<google-sheets:oauth-authorization-code consumerKey="qdwe" consumerSecret="efw341" />
+			<google-sheets:oauth-callback-config listenerConfig="HTTP_Listener_config" callbackPath="/asdf" authorizePath="/adsfsa" />
+		</google-sheets:oauth-2-0-connection>
+	</google-sheets:config>
+	<sockets:request-config name="Sockets_Request_config" doc:name="Sockets Request config" doc:id="026237e2-903a-4d4a-903c-650ecca8b10e" >
+		<sockets:tcp-requester-connection host="localhost" port="9024" />
+	</sockets:request-config>
+	<twilio:config name="Twilio_Connector_Config_test" doc:name="Twilio Connector Config" doc:id="d58b8a59-e250-4c22-ba2c-7f328bf80a8d" >
+		<twilio:account-sid-auth-token-connection username="" password="" />
+	</twilio:config>
+	<flow name="ReplicateTradeFlow2" doc:id="129b5955-ad36-4f73-9dd1-7e7bae04e64c">
+		<http:listener doc:name="Listener" doc:id="17573067-456d-4973-8df4-d63381de8553" config-ref="HTTP_Listener_config" path="/send"/>
+		<ee:transform doc:name="Transform Message" doc:id="2a51a05f-783e-4500-8f49-a8ae1d054d56">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/x-www-form-urlencoded
+---
+{
+	From: payload.from,
+	To: payload.to,
+	Stock: payload.stock
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<scatter-gather doc:name="Scatter-Gather" doc:id="cf86a50b-0d47-4062-b0ed-36244106babb" >
+			<route >
+				<ee:transform doc:name="Transform Message" doc:id="90a7e4ef-7980-492b-b485-02cd0017a1c8">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Stock: payload.Stock
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				<td-ameritrade:get-quote doc:name="Get Quote" doc:id="6397252f-32f7-42c8-ac3a-852ac49d0ad4" config-ref="Td_Ameritrade_Connector_Config" symbolUriParam="#[output application/java&#10;---&#10;payload.Stock as String]" apiKeyQueryParam=""/>
+			</route>
+			<route >
+				<ee:transform doc:name="Transform Message" doc:id="a267fa8e-89aa-42fd-88b5-a67c5a2cf3a2" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/x-www-form-urlencoded
+---
+{
+	From: payload.From as String,
+	To: payload.To as String,
+	Stock: payload.Stock
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</route>
+		</scatter-gather>
+		<ee:transform doc:name="Transform Message" doc:id="b874f22a-989d-459d-aa4e-736a9af6541d">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/x-www-form-urlencoded
+var stockSymbol = payload."1".payload.Stock
+---
+{
+	From: payload."1".payload.From,
+	To: payload."1".payload.To,
+	Body: payload[0].payload."$(stockSymbol)".lastPrice
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<twilio:create20100401-accounts-messagesjson-by-account-sid doc:name="Create Message" doc:id="6de5e31d-363a-4d9b-bbee-126958a51ab2" accountSid="" config-ref="Twilio_Connector_Config_test" >
+			<twilio:accounts-messages-content ><![CDATA[#[output application/x-www-form-urlencoded
+---
+{
+	From: payload.From,
+	To: payload.To,
+	Body: payload.Body as String
+}]]]></twilio:accounts-messages-content>
+		</twilio:create20100401-accounts-messagesjson-by-account-sid>
+		<ee:transform doc:name="Transform Message" doc:id="4b9551e7-cf03-46e1-8b79-da62e7d22dcf" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
